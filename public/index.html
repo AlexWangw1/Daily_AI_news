@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI News Archive</title>
+  <meta
+    name="description"
+    content="Archived AI news with locally stored article content and Chinese translation."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;800&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand-mark" href="/">
+        <span class="brand-mark__pulse" aria-hidden="true"></span>
+        <span class="brand-mark__text" id="brand-label">AI News Archive</span>
+      </a>
+      <div class="site-header__meta">
+        <p class="site-header__issue" id="site-note"></p>
+        <div class="site-header__actions">
+          <section class="user-panel" aria-labelledby="user-panel-label">
+            <p class="user-panel__label" id="user-panel-label"></p>
+            <div class="user-panel__controls">
+              <select class="user-panel__select" id="user-select"></select>
+              <form class="user-panel__form" id="user-form">
+                <input class="user-panel__input" id="user-input" type="text" maxlength="32">
+                <button class="secondary-button" id="user-create-button" type="submit"></button>
+              </form>
+            </div>
+            <p class="user-panel__meta" id="user-meta"></p>
+          </section>
+          <button class="ghost-button" id="refresh-button" type="button"></button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="status-panel is-hidden" id="status-panel" aria-live="polite">
+        <p class="status-panel__eyebrow" id="status-label"></p>
+        <h2 class="status-panel__title" id="status-title"></h2>
+        <p class="status-panel__body" id="status-body"></p>
+      </section>
+
+      <section class="rail-panel" aria-labelledby="rail-title">
+        <div class="rail-panel__header">
+          <div>
+            <p class="eyebrow" id="rail-kicker"></p>
+            <h2 class="rail-panel__title" id="rail-title"></h2>
+          </div>
+          <div class="rail-panel__actions">
+            <p class="rail-panel__count" id="rail-count"></p>
+            <button class="secondary-button" id="prev-page-button" type="button"></button>
+            <button class="secondary-button" id="next-page-button" type="button"></button>
+          </div>
+        </div>
+        <div class="rail-scrollbar" id="rail-scrollbar" aria-hidden="true">
+          <div class="rail-scrollbar__spacer" id="rail-scrollbar-spacer"></div>
+        </div>
+        <div class="news-rail" id="news-rail"></div>
+      </section>
+
+      <section class="reader-panel" id="reader-panel" aria-labelledby="reader-title">
+        <div class="reader-panel__head">
+          <div>
+            <p class="eyebrow" id="reader-kicker"></p>
+            <h2 class="reader-panel__title" id="reader-title"></h2>
+          </div>
+          <div class="reader-panel__meta-group">
+            <p class="reader-panel__meta" id="reader-meta"></p>
+            <p class="reader-panel__archive" id="reader-archive"></p>
+            <p class="reader-panel__viewed" id="reader-viewed"></p>
+          </div>
+        </div>
+        <p class="reader-panel__summary" id="reader-summary"></p>
+        <div class="reader-panel__body" id="reader-body"></div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

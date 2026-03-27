@@ -1,0 +1,6 @@
+node_modules/
+data/ai-news.json
+data/ai-news.db
+data/ai-news.db-shm
+data/ai-news.db-wal
+npm-debug.log*
