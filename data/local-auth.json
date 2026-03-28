@@ -1,0 +1,42 @@
+{
+  "users": [
+    {
+      "id": "72dd45f0-f88f-45f8-b19e-f7624b60116f",
+      "name": "123",
+      "email": "shijiewang0310@gmail.com",
+      "passwordHash": "d709f010b0613035240924e969ea5f179114f7190fecb9645791cf738a74b7ac4a840ec9ab67e0e176bffcf774d54e991248e6c3e4908a454fe8f45f68c7e0e5",
+      "passwordSalt": "094d25d21f745345bfadd2d9d0f891d2",
+      "createdAt": "2026-03-28T11:48:13.242Z",
+      "updatedAt": "2026-03-28T11:48:19.273Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "af747078-1b5c-4a52-9e6e-78f6c92b4dad",
+      "userId": "72dd45f0-f88f-45f8-b19e-f7624b60116f",
+      "tokenHash": "d10da9743ef60aff17e5f02634e9d44dbc9fff8820723335b0c737c01ed75c71",
+      "createdAt": "2026-03-28T11:48:13.266Z",
+      "expiresAt": "2026-04-27T11:48:13.266Z",
+      "lastSeenAt": "2026-03-28T12:10:48.336Z",
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+    }
+  ],
+  "articleViews": [
+    {
+      "userId": "72dd45f0-f88f-45f8-b19e-f7624b60116f",
+      "articleId": "techcrunch-ai-5a5b1b3a130f3b60",
+      "viewedAt": "2026-03-28T11:48:13.561Z"
+    },
+    {
+      "userId": "72dd45f0-f88f-45f8-b19e-f7624b60116f",
+      "articleId": "arxiv-cs-cv-2388dadc68f3cc11",
+      "viewedAt": "2026-03-28T11:48:13.568Z"
+    },
+    {
+      "userId": "72dd45f0-f88f-45f8-b19e-f7624b60116f",
+      "articleId": "arxiv-cs-cv-03a265787b3605f3",
+      "viewedAt": "2026-03-28T11:48:19.273Z"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { fetchTextWithFallback } from './network.mjs';
 
 const ARTICLE_SELECTORS = [
   'article',
@@ -46,21 +47,11 @@ export async function fetchArchivedArticle(article) {
     });
   }
 
-  const response = await fetch(article.url, {
-    headers: {
-      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'user-agent': 'DailyAINewsBot/1.0 (+https://github.com/openai/codex)',
-    },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(15000),
+  const rawHtml = await fetchTextWithFallback(article.url, {
+    accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    timeoutMs: 20000,
   });
-
-  if (!response.ok) {
-    throw new Error(`article HTTP ${response.status}`);
-  }
-
-  const rawHtml = await response.text();
-  const extracted = extractArticleContent(rawHtml);
+  const extracted = extractArticleContent(rawHtml, article.url);
 
   return buildArticleArchive({
     rawHtml,
@@ -69,7 +60,7 @@ export async function fetchArchivedArticle(article) {
   });
 }
 
-function extractArticleContent(rawHtml) {
+function extractArticleContent(rawHtml, articleUrl) {
   const $ = cheerio.load(rawHtml);
   BLOCKLIST_SELECTORS.forEach((selector) => {
     $(selector).remove();
@@ -82,7 +73,7 @@ function extractArticleContent(rawHtml) {
 
   return {
     contentText,
-    imageUrl: findImageUrl($),
+    imageUrl: findImageUrl($, articleUrl),
   };
 }
 
@@ -176,7 +167,7 @@ function normalizeWhitespace(value) {
     .trim();
 }
 
-function findImageUrl($) {
+function findImageUrl($, articleUrl) {
   const candidates = [
     $('meta[property="og:image"]').attr('content'),
     $('meta[name="twitter:image"]').attr('content'),
@@ -185,12 +176,26 @@ function findImageUrl($) {
   ];
 
   for (const candidate of candidates) {
-    if (candidate && /^https?:\/\//i.test(candidate)) {
-      return candidate;
+    const normalized = normalizeImageUrl(candidate, articleUrl);
+    if (normalized) {
+      return normalized;
     }
   }
 
   return '';
+}
+
+function normalizeImageUrl(candidate, articleUrl) {
+  const raw = String(candidate ?? '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  try {
+    return new URL(raw, articleUrl).toString();
+  } catch {
+    return '';
+  }
 }
 
 function buildArticleArchive(value) {

@@ -2,58 +2,65 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import './lib/env/load-env.mjs';
 import {
-  createUserSession,
+  changeAccountPassword,
   getEmptyNewsPayload,
-  loadUserSession,
+  loadAccountProfile,
+  loadAuthSession,
   loadNewsArticle,
   loadNewsPayload,
+  loadPaperArticle,
+  loadPaperPayload,
+  loginAuthUser,
+  logoutAuthUser,
   markNewsArticleViewed,
-  selectUserSession,
+  registerAuthUser,
 } from './lib/server/news-store.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 const publicDir = path.join(projectRoot, 'public');
+const NEWS_LIST_LIMIT = 80;
+const shouldUseSecureCookies = process.env.SESSION_COOKIE_SECURE === 'true'
+  || process.env.NODE_ENV === 'production';
 
 const app = express();
 const port = Number.parseInt(process.env.PORT ?? '3000', 10);
-const USER_COOKIE_NAME = 'ai_news_user';
+const SESSION_COOKIE_NAME = 'ai_news_session';
+const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 app.use(express.json());
 
-app.get('/api/session', async (req, res, next) => {
+app.get('/api/auth/session', async (req, res, next) => {
   try {
-    const cookieUserId = getUserIdFromRequest(req);
-    const session = await loadUserSession(cookieUserId);
-
-    if (session.resolvedUserId && session.resolvedUserId !== cookieUserId) {
-      setUserCookie(res, session.resolvedUserId);
-    }
-
+    const authSession = await getRequestAuthSession(req);
     res.setHeader('Cache-Control', 'no-store');
     res.json({
-      currentUser: session.currentUser,
-      users: session.users,
+      authenticated: authSession.authenticated,
+      user: authSession.user,
+      expiresAt: authSession.expiresAt,
     });
   } catch (error) {
     next(error);
   }
 });
 
-app.post('/api/users', async (req, res, next) => {
+app.post('/api/auth/register', async (req, res, next) => {
   try {
-    const session = await createUserSession(req.body?.name);
-    setUserCookie(res, session.resolvedUserId);
+    const authSession = await registerAuthUser(req.body, getRequestMetadata(req));
+    setSessionCookie(res, authSession.sessionCookieValue);
     res.setHeader('Cache-Control', 'no-store');
     res.status(201).json({
-      currentUser: session.currentUser,
-      users: session.users,
+      authenticated: true,
+      user: authSession.user,
+      expiresAt: authSession.expiresAt,
     });
   } catch (error) {
-    if (error?.message === 'User name is required.') {
+    if (isAuthValidationError(error)) {
       res.status(400).json({ error: error.message });
       return;
     }
@@ -62,29 +69,103 @@ app.post('/api/users', async (req, res, next) => {
   }
 });
 
-app.post('/api/session', async (req, res, next) => {
+app.post('/api/auth/login', async (req, res, next) => {
   try {
-    const session = await selectUserSession(req.body?.userId);
+    const authSession = await loginAuthUser(req.body, getRequestMetadata(req));
 
-    if (!session) {
-      res.status(404).json({ error: 'User Not Found' });
+    if (!authSession) {
+      res.status(401).json({ error: 'Invalid credentials.' });
       return;
     }
 
-    setUserCookie(res, session.resolvedUserId);
+    setSessionCookie(res, authSession.sessionCookieValue);
     res.setHeader('Cache-Control', 'no-store');
     res.json({
-      currentUser: session.currentUser,
-      users: session.users,
+      authenticated: true,
+      user: authSession.user,
+      expiresAt: authSession.expiresAt,
     });
   } catch (error) {
     next(error);
   }
 });
 
-app.get('/api/news', async (_req, res, next) => {
+app.post('/api/auth/logout', async (req, res, next) => {
   try {
-    const payload = await loadNewsPayload(60, getUserIdFromRequest(_req));
+    const sessionCookieValue = getSessionCookieValue(req);
+    await logoutAuthUser(sessionCookieValue);
+    clearSessionCookie(res);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/account', async (req, res, next) => {
+  try {
+    const authSession = await getRequestAuthSession(req);
+
+    if (!authSession.authenticated) {
+      res.status(401).json({ error: 'Authentication Required' });
+      return;
+    }
+
+    const profile = await loadAccountProfile(authSession);
+
+    if (!profile) {
+      res.status(404).json({ error: 'Not Found' });
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(profile);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/account/password', async (req, res, next) => {
+  try {
+    const authSession = await getRequestAuthSession(req);
+
+    if (!authSession.authenticated) {
+      res.status(401).json({ error: 'Authentication Required' });
+      return;
+    }
+
+    const profile = await changeAccountPassword(authSession, req.body);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      ok: true,
+      user: profile.user,
+      security: profile.security,
+    });
+  } catch (error) {
+    if (isAuthValidationError(error)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+
+    next(error);
+  }
+});
+
+app.get('/api/news', async (req, res, next) => {
+  try {
+    const authSession = await getRequestAuthSession(req);
+    const payload = await loadNewsPayload(NEWS_LIST_LIMIT, authSession);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(payload);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/papers', async (req, res, next) => {
+  try {
+    const authSession = await getRequestAuthSession(req);
+    const payload = await loadPaperPayload(NEWS_LIST_LIMIT, authSession);
     res.setHeader('Cache-Control', 'no-store');
     res.json(payload);
   } catch (error) {
@@ -94,15 +175,49 @@ app.get('/api/news', async (_req, res, next) => {
 
 app.get('/api/news/:id', async (req, res, next) => {
   try {
-    const article = await loadNewsArticle(req.params.id, getUserIdFromRequest(req));
+    const authSession = await getRequestAuthSession(req);
+    const result = await loadNewsArticle(req.params.id, authSession);
 
-    if (!article) {
+    if (result.errorCode === 'AUTH_REQUIRED') {
+      res.status(401).json({
+        error: 'Authentication Required',
+        previewArticleId: result.previewArticleId,
+      });
+      return;
+    }
+
+    if (!result.article) {
       res.status(404).json({ error: 'Not Found' });
       return;
     }
 
     res.setHeader('Cache-Control', 'no-store');
-    res.json(article);
+    res.json(result.article);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/papers/:id', async (req, res, next) => {
+  try {
+    const authSession = await getRequestAuthSession(req);
+    const result = await loadPaperArticle(req.params.id, authSession);
+
+    if (result.errorCode === 'AUTH_REQUIRED') {
+      res.status(401).json({
+        error: 'Authentication Required',
+        previewArticleId: result.previewArticleId,
+      });
+      return;
+    }
+
+    if (!result.article) {
+      res.status(404).json({ error: 'Not Found' });
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(result.article);
   } catch (error) {
     next(error);
   }
@@ -110,14 +225,37 @@ app.get('/api/news/:id', async (req, res, next) => {
 
 app.post('/api/news/:id/view', async (req, res, next) => {
   try {
-    const userId = getUserIdFromRequest(req);
+    const authSession = await getRequestAuthSession(req);
 
-    if (!userId) {
-      res.status(401).json({ error: 'User session required' });
+    if (!authSession.authenticated) {
+      res.status(401).json({ error: 'Authentication Required' });
       return;
     }
 
-    const viewState = await markNewsArticleViewed(req.params.id, userId);
+    const viewState = await markNewsArticleViewed(req.params.id, authSession);
+
+    if (!viewState) {
+      res.status(404).json({ error: 'Not Found' });
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(viewState);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/papers/:id/view', async (req, res, next) => {
+  try {
+    const authSession = await getRequestAuthSession(req);
+
+    if (!authSession.authenticated) {
+      res.status(401).json({ error: 'Authentication Required' });
+      return;
+    }
+
+    const viewState = await markNewsArticleViewed(req.params.id, authSession);
 
     if (!viewState) {
       res.status(404).json({ error: 'Not Found' });
@@ -152,6 +290,16 @@ app.use((req, res) => {
 
 app.use((error, _req, res, _next) => {
   console.error('[server] Unhandled error:', error);
+
+  if (isDatabaseUnavailableError(error)) {
+    res.status(503).json({
+      error: 'Database Unavailable',
+      detail: 'PostgreSQL is not configured or not reachable.',
+      payload: getEmptyNewsPayload(),
+    });
+    return;
+  }
+
   res.status(500).json({
     error: 'Internal Server Error',
     payload: getEmptyNewsPayload(),
@@ -162,14 +310,48 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`Daily AI News running at http://localhost:${port}`);
 });
 
-function getUserIdFromRequest(req) {
-  const cookieHeader = req.headers.cookie ?? '';
-  const cookies = parseCookies(cookieHeader);
-  return cookies[USER_COOKIE_NAME] ?? null;
+async function getRequestAuthSession(req) {
+  const sessionCookieValue = getSessionCookieValue(req);
+  const authSession = await loadAuthSession(sessionCookieValue);
+
+  return {
+    ...authSession,
+    sessionCookieValue,
+  };
 }
 
-function setUserCookie(res, userId) {
-  res.append('Set-Cookie', `${USER_COOKIE_NAME}=${encodeURIComponent(userId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`);
+function getRequestMetadata(req) {
+  return {
+    ipAddress: getRemoteAddress(req),
+    userAgent: req.headers['user-agent'] ?? '',
+  };
+}
+
+function getRemoteAddress(req) {
+  const forwardedFor = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
+  return forwardedFor || req.socket.remoteAddress || '';
+}
+
+function getSessionCookieValue(req) {
+  const cookieHeader = req.headers.cookie ?? '';
+  const cookies = parseCookies(cookieHeader);
+  return cookies[SESSION_COOKIE_NAME] ?? '';
+}
+
+function setSessionCookie(res, sessionCookieValue) {
+  const secureFlag = shouldUseSecureCookies ? '; Secure' : '';
+  res.append(
+    'Set-Cookie',
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(sessionCookieValue)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}${secureFlag}`,
+  );
+}
+
+function clearSessionCookie(res) {
+  const secureFlag = shouldUseSecureCookies ? '; Secure' : '';
+  res.append(
+    'Set-Cookie',
+    `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secureFlag}`,
+  );
 }
 
 function parseCookies(cookieHeader) {
@@ -189,4 +371,24 @@ function parseCookies(cookieHeader) {
       cookies[key] = decodeURIComponent(value);
       return cookies;
     }, {});
+}
+
+function isAuthValidationError(error) {
+  return [
+    'Authentication required.',
+    'Name is required.',
+    'Valid email is required.',
+    'Password must be at least 8 characters.',
+    'Password must include letters and numbers.',
+    'Email already registered.',
+    'Name already registered.',
+    'Current password is required.',
+    'Current password is incorrect.',
+    'New password must be different from current password.',
+  ].includes(error?.message);
+}
+
+function isDatabaseUnavailableError(error) {
+  return error?.message === 'DATABASE_URL is required for PostgreSQL storage.'
+    || ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT'].includes(error?.code);
 }

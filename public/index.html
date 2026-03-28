@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI News Archive</title>
+  <title>AI 新闻与论文归档</title>
   <meta
     name="description"
-    content="Archived AI news with locally stored article content and Chinese translation."
+    content="本地归档最新 AI 新闻与论文，支持中文重写、知识图谱、时间脉络与登录后全文阅读。"
   >
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,66 +21,234 @@
     <header class="site-header">
       <a class="brand-mark" href="/">
         <span class="brand-mark__pulse" aria-hidden="true"></span>
-        <span class="brand-mark__text" id="brand-label">AI News Archive</span>
+        <span class="brand-mark__text" id="brand-label">AI 新闻与论文归档</span>
       </a>
       <div class="site-header__meta">
-        <p class="site-header__issue" id="site-note"></p>
-        <div class="site-header__actions">
-          <section class="user-panel" aria-labelledby="user-panel-label">
-            <p class="user-panel__label" id="user-panel-label"></p>
-            <div class="user-panel__controls">
-              <select class="user-panel__select" id="user-select"></select>
-              <form class="user-panel__form" id="user-form">
-                <input class="user-panel__input" id="user-input" type="text" maxlength="32">
-                <button class="secondary-button" id="user-create-button" type="submit"></button>
-              </form>
-            </div>
-            <p class="user-panel__meta" id="user-meta"></p>
-          </section>
-          <button class="ghost-button" id="refresh-button" type="button"></button>
+        <div class="auth-bar">
+          <p class="auth-bar__status" id="auth-status"></p>
+          <button class="secondary-button" id="auth-open-button" type="button">登录</button>
+          <button class="ghost-button" id="auth-register-button" type="button">注册</button>
+          <a class="secondary-button auth-bar__account-link" id="account-button" href="/account" hidden>用户中心</a>
+          <button class="ghost-button" id="logout-button" type="button" hidden>退出登录</button>
+          <button class="ghost-button" id="refresh-button" type="button">刷新内容</button>
         </div>
       </div>
     </header>
 
-    <main>
-      <section class="status-panel is-hidden" id="status-panel" aria-live="polite">
-        <p class="status-panel__eyebrow" id="status-label"></p>
-        <h2 class="status-panel__title" id="status-title"></h2>
-        <p class="status-panel__body" id="status-body"></p>
+    <section class="feed-picker" aria-label="内容切换">
+      <div class="feed-picker__group" role="tablist" aria-label="内容切换">
+        <button
+          class="feed-picker__button"
+          type="button"
+          role="tab"
+          aria-controls="feed-news"
+          aria-selected="true"
+          data-action="show-feed"
+          data-feed-target="news"
+        >
+          <span class="feed-picker__button-copy">
+            <span class="feed-picker__button-title">AI 新闻</span>
+            <span class="feed-picker__button-meta" data-feed-meta="news">最新归档</span>
+          </span>
+          <span class="feed-picker__button-badge" data-feed-count="news">--</span>
+        </button>
+        <button
+          class="feed-picker__button"
+          type="button"
+          role="tab"
+          aria-controls="feed-papers"
+          aria-selected="false"
+          data-action="show-feed"
+          data-feed-target="papers"
+        >
+          <span class="feed-picker__button-copy">
+            <span class="feed-picker__button-title">AI 论文</span>
+            <span class="feed-picker__button-meta" data-feed-meta="papers">最新归档</span>
+          </span>
+          <span class="feed-picker__button-badge" data-feed-count="papers">--</span>
+        </button>
+      </div>
+    </section>
+
+    <main class="feed-stack">
+      <section class="feed-module" id="feed-news" data-feed="news" aria-labelledby="news-module-title">
+        <div class="feed-module__intro">
+          <p class="eyebrow" data-role="module-kicker"></p>
+          <h2 class="feed-module__title" id="news-module-title" data-role="module-title"></h2>
+          <p class="feed-module__body" data-role="module-body"></p>
+        </div>
+
+        <section class="status-panel is-hidden" data-role="status-panel" aria-live="polite">
+          <p class="status-panel__eyebrow" data-role="status-label"></p>
+          <h3 class="status-panel__title" data-role="status-title"></h3>
+          <p class="status-panel__body" data-role="status-body"></p>
+        </section>
+
+        <section class="rail-panel" aria-labelledby="news-rail-title">
+          <div class="rail-panel__header">
+            <div>
+              <p class="eyebrow" data-role="rail-kicker"></p>
+              <h3 class="rail-panel__title" id="news-rail-title" data-role="rail-title"></h3>
+            </div>
+            <div class="rail-panel__actions">
+              <p class="rail-panel__count" data-role="rail-count"></p>
+              <button class="secondary-button" data-action="prev-page" type="button"></button>
+              <button class="secondary-button" data-action="next-page" type="button"></button>
+            </div>
+          </div>
+          <div class="rail-scrollbar" data-role="rail-scrollbar" aria-hidden="true">
+            <div class="rail-scrollbar__spacer" data-role="rail-scrollbar-spacer"></div>
+          </div>
+          <div class="news-rail" data-role="rail"></div>
+        </section>
+
+        <section class="reader-panel" data-role="reader-panel" aria-labelledby="news-reader-title">
+          <figure class="reader-panel__visual is-hidden" data-role="reader-visual">
+            <img class="reader-panel__image" data-role="reader-image" alt="">
+          </figure>
+          <div class="reader-panel__head">
+            <div>
+              <p class="eyebrow" data-role="reader-kicker"></p>
+              <h3 class="reader-panel__title" id="news-reader-title" data-role="reader-title"></h3>
+            </div>
+            <div class="reader-panel__meta-group">
+              <p class="reader-panel__meta" data-role="reader-meta"></p>
+              <p class="reader-panel__archive" data-role="reader-archive"></p>
+              <p class="reader-panel__viewed" data-role="reader-viewed"></p>
+            </div>
+          </div>
+          <p class="reader-panel__summary" data-role="reader-summary"></p>
+          <section class="easy-read" data-role="easy-read-panel" aria-labelledby="news-easy-read-title">
+            <div class="easy-read__header">
+              <p class="eyebrow" data-role="easy-read-kicker"></p>
+              <h4 class="easy-read__title" id="news-easy-read-title" data-role="easy-read-title"></h4>
+            </div>
+            <div class="easy-read__grid">
+              <article class="easy-read__card">
+                <h5 class="easy-read__card-title" data-role="easy-summary-title"></h5>
+                <p class="easy-read__text" data-role="easy-summary-text"></p>
+              </article>
+              <article class="easy-read__card">
+                <h5 class="easy-read__card-title" data-role="easy-why-title"></h5>
+                <p class="easy-read__text" data-role="easy-why-text"></p>
+              </article>
+            </div>
+            <article class="easy-read__card">
+              <h5 class="easy-read__card-title" data-role="easy-points-title"></h5>
+              <ul class="easy-read__list" data-role="easy-points-list"></ul>
+            </article>
+            <article class="easy-read__card" data-role="easy-glossary-card">
+              <h5 class="easy-read__card-title" data-role="easy-glossary-title"></h5>
+              <div class="easy-read__glossary" data-role="easy-glossary-list"></div>
+            </article>
+          </section>
+          <div class="reader-panel__body" data-role="reader-body"></div>
+          <section class="knowledge-map" data-role="knowledge-map-panel" aria-labelledby="news-knowledge-map-title">
+            <div class="knowledge-map__header">
+              <p class="eyebrow" data-role="knowledge-map-kicker"></p>
+              <h4 class="knowledge-map__title" id="news-knowledge-map-title" data-role="knowledge-map-title"></h4>
+            </div>
+            <div class="knowledge-map__canvas" data-role="knowledge-map-canvas"></div>
+            <section class="knowledge-timeline" data-role="knowledge-timeline-panel" aria-labelledby="news-knowledge-timeline-title">
+              <div class="knowledge-timeline__header">
+                <p class="eyebrow" data-role="knowledge-timeline-kicker"></p>
+                <h5 class="knowledge-timeline__title" id="news-knowledge-timeline-title" data-role="knowledge-timeline-title"></h5>
+                <p class="knowledge-timeline__summary" data-role="knowledge-timeline-summary"></p>
+              </div>
+              <div class="knowledge-timeline__track" data-role="knowledge-timeline-track"></div>
+            </section>
+          </section>
+        </section>
       </section>
 
-      <section class="rail-panel" aria-labelledby="rail-title">
-        <div class="rail-panel__header">
-          <div>
-            <p class="eyebrow" id="rail-kicker"></p>
-            <h2 class="rail-panel__title" id="rail-title"></h2>
-          </div>
-          <div class="rail-panel__actions">
-            <p class="rail-panel__count" id="rail-count"></p>
-            <button class="secondary-button" id="prev-page-button" type="button"></button>
-            <button class="secondary-button" id="next-page-button" type="button"></button>
-          </div>
+      <section class="feed-module" id="feed-papers" data-feed="papers" aria-labelledby="papers-module-title">
+        <div class="feed-module__intro">
+          <p class="eyebrow" data-role="module-kicker"></p>
+          <h2 class="feed-module__title" id="papers-module-title" data-role="module-title"></h2>
+          <p class="feed-module__body" data-role="module-body"></p>
         </div>
-        <div class="rail-scrollbar" id="rail-scrollbar" aria-hidden="true">
-          <div class="rail-scrollbar__spacer" id="rail-scrollbar-spacer"></div>
-        </div>
-        <div class="news-rail" id="news-rail"></div>
-      </section>
 
-      <section class="reader-panel" id="reader-panel" aria-labelledby="reader-title">
-        <div class="reader-panel__head">
-          <div>
-            <p class="eyebrow" id="reader-kicker"></p>
-            <h2 class="reader-panel__title" id="reader-title"></h2>
+        <section class="status-panel is-hidden" data-role="status-panel" aria-live="polite">
+          <p class="status-panel__eyebrow" data-role="status-label"></p>
+          <h3 class="status-panel__title" data-role="status-title"></h3>
+          <p class="status-panel__body" data-role="status-body"></p>
+        </section>
+
+        <section class="rail-panel" aria-labelledby="papers-rail-title">
+          <div class="rail-panel__header">
+            <div>
+              <p class="eyebrow" data-role="rail-kicker"></p>
+              <h3 class="rail-panel__title" id="papers-rail-title" data-role="rail-title"></h3>
+            </div>
+            <div class="rail-panel__actions">
+              <p class="rail-panel__count" data-role="rail-count"></p>
+              <button class="secondary-button" data-action="prev-page" type="button"></button>
+              <button class="secondary-button" data-action="next-page" type="button"></button>
+            </div>
           </div>
-          <div class="reader-panel__meta-group">
-            <p class="reader-panel__meta" id="reader-meta"></p>
-            <p class="reader-panel__archive" id="reader-archive"></p>
-            <p class="reader-panel__viewed" id="reader-viewed"></p>
+          <div class="rail-scrollbar" data-role="rail-scrollbar" aria-hidden="true">
+            <div class="rail-scrollbar__spacer" data-role="rail-scrollbar-spacer"></div>
           </div>
-        </div>
-        <p class="reader-panel__summary" id="reader-summary"></p>
-        <div class="reader-panel__body" id="reader-body"></div>
+          <div class="news-rail" data-role="rail"></div>
+        </section>
+
+        <section class="reader-panel" data-role="reader-panel" aria-labelledby="papers-reader-title">
+          <figure class="reader-panel__visual is-hidden" data-role="reader-visual">
+            <img class="reader-panel__image" data-role="reader-image" alt="">
+          </figure>
+          <div class="reader-panel__head">
+            <div>
+              <p class="eyebrow" data-role="reader-kicker"></p>
+              <h3 class="reader-panel__title" id="papers-reader-title" data-role="reader-title"></h3>
+            </div>
+            <div class="reader-panel__meta-group">
+              <p class="reader-panel__meta" data-role="reader-meta"></p>
+              <p class="reader-panel__archive" data-role="reader-archive"></p>
+              <p class="reader-panel__viewed" data-role="reader-viewed"></p>
+            </div>
+          </div>
+          <p class="reader-panel__summary" data-role="reader-summary"></p>
+          <section class="easy-read" data-role="easy-read-panel" aria-labelledby="papers-easy-read-title">
+            <div class="easy-read__header">
+              <p class="eyebrow" data-role="easy-read-kicker"></p>
+              <h4 class="easy-read__title" id="papers-easy-read-title" data-role="easy-read-title"></h4>
+            </div>
+            <div class="easy-read__grid">
+              <article class="easy-read__card">
+                <h5 class="easy-read__card-title" data-role="easy-summary-title"></h5>
+                <p class="easy-read__text" data-role="easy-summary-text"></p>
+              </article>
+              <article class="easy-read__card">
+                <h5 class="easy-read__card-title" data-role="easy-why-title"></h5>
+                <p class="easy-read__text" data-role="easy-why-text"></p>
+              </article>
+            </div>
+            <article class="easy-read__card">
+              <h5 class="easy-read__card-title" data-role="easy-points-title"></h5>
+              <ul class="easy-read__list" data-role="easy-points-list"></ul>
+            </article>
+            <article class="easy-read__card" data-role="easy-glossary-card">
+              <h5 class="easy-read__card-title" data-role="easy-glossary-title"></h5>
+              <div class="easy-read__glossary" data-role="easy-glossary-list"></div>
+            </article>
+          </section>
+          <div class="reader-panel__body" data-role="reader-body"></div>
+          <section class="knowledge-map" data-role="knowledge-map-panel" aria-labelledby="papers-knowledge-map-title">
+            <div class="knowledge-map__header">
+              <p class="eyebrow" data-role="knowledge-map-kicker"></p>
+              <h4 class="knowledge-map__title" id="papers-knowledge-map-title" data-role="knowledge-map-title"></h4>
+            </div>
+            <div class="knowledge-map__canvas" data-role="knowledge-map-canvas"></div>
+            <section class="knowledge-timeline" data-role="knowledge-timeline-panel" aria-labelledby="papers-knowledge-timeline-title">
+              <div class="knowledge-timeline__header">
+                <p class="eyebrow" data-role="knowledge-timeline-kicker"></p>
+                <h5 class="knowledge-timeline__title" id="papers-knowledge-timeline-title" data-role="knowledge-timeline-title"></h5>
+                <p class="knowledge-timeline__summary" data-role="knowledge-timeline-summary"></p>
+              </div>
+              <div class="knowledge-timeline__track" data-role="knowledge-timeline-track"></div>
+            </section>
+          </section>
+        </section>
       </section>
     </main>
   </div>

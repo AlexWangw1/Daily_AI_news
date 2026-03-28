@@ -7,11 +7,17 @@
     "dev": "node --watch src/server.mjs",
     "start": "node src/server.mjs",
     "news:fetch": "node scripts/fetch-ai-news.mjs",
-    "news:fetch:fast": "node scripts/fetch-ai-news.mjs --skip-translate"
+    "news:fetch:fast": "node scripts/fetch-ai-news.mjs --skip-translate",
+    "papers:fetch": "node scripts/fetch-ai-papers.mjs",
+    "papers:fetch:fast": "node scripts/fetch-ai-papers.mjs --skip-translate",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:migrate:legacy": "node scripts/migrate-legacy-data.mjs"
   },
   "dependencies": {
     "cheerio": "^1.2.0",
     "express": "^5.1.0",
+    "pg": "^8.20.0",
     "rss-parser": "^3.13.0"
   }
 }

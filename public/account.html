@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户中心 | AI 新闻与论文归档</title>
+  <meta
+    name="description"
+    content="集中管理账号信息、登录安全、密码修改与第三方绑定状态。"
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;800&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="account-page">
+  <div class="account-shell">
+    <header class="site-header">
+      <a class="brand-mark" href="/">
+        <span class="brand-mark__pulse" aria-hidden="true"></span>
+        <span class="brand-mark__text">AI 新闻与论文归档</span>
+      </a>
+      <div class="site-header__meta">
+        <div class="auth-bar">
+          <p class="auth-bar__status" id="account-header-status"></p>
+          <a class="ghost-button" href="/">返回首页</a>
+          <button class="ghost-button" id="account-logout-button" type="button">退出登录</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="account-layout">
+      <section class="account-hero">
+        <p class="eyebrow">用户中心</p>
+        <h1 class="account-hero__title">管理你的账号、安全设置与第三方登录入口。</h1>
+        <p class="account-hero__body">
+          这里集中展示账号信息、阅读归档进度、密码安全与第三方接入状态。真正的 OAuth
+          回调还需要后端平台凭据，这一页会先把管理结构和安全链路准备好。
+        </p>
+      </section>
+
+      <section class="account-grid">
+        <section class="account-section">
+          <div class="account-section__head">
+            <div>
+              <p class="eyebrow">账号概览</p>
+              <h2 class="account-section__title">当前账号</h2>
+              <p class="account-section__body">查看你的基础资料与归档阅读进度。</p>
+            </div>
+          </div>
+          <div class="account-kv">
+            <div class="account-kv__item">
+              <span class="account-kv__label">显示名</span>
+              <span class="account-kv__value" id="account-name">--</span>
+            </div>
+            <div class="account-kv__item">
+              <span class="account-kv__label">邮箱</span>
+              <span class="account-kv__value" id="account-email">--</span>
+            </div>
+            <div class="account-kv__item">
+              <span class="account-kv__label">创建时间</span>
+              <span class="account-kv__value" id="account-created-at">--</span>
+            </div>
+            <div class="account-kv__item">
+              <span class="account-kv__label">已读归档</span>
+              <span class="account-kv__value" id="account-viewed-count">--</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="account-section">
+          <div class="account-section__head">
+            <div>
+              <p class="eyebrow">安全设置</p>
+              <h2 class="account-section__title">登录安全</h2>
+              <p class="account-section__body">确认密码状态、最近更新时间与当前会话有效期。</p>
+            </div>
+          </div>
+          <div class="account-kv">
+            <div class="account-kv__item">
+              <span class="account-kv__label">密码状态</span>
+              <span class="account-kv__value" id="account-password-status">--</span>
+            </div>
+            <div class="account-kv__item">
+              <span class="account-kv__label">密码最近更新</span>
+              <span class="account-kv__value" id="account-password-updated-at">--</span>
+            </div>
+            <div class="account-kv__item">
+              <span class="account-kv__label">当前会话截止</span>
+              <span class="account-kv__value" id="account-session-expires-at">--</span>
+            </div>
+            <div class="account-kv__item">
+              <span class="account-kv__label">登录方式</span>
+              <span class="account-kv__value">邮箱 / 密码</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="account-section">
+          <div class="account-section__head">
+            <div>
+              <p class="eyebrow">密码管理</p>
+              <h2 class="account-section__title">修改密码</h2>
+              <p class="account-section__body">修改后下次登录会使用新密码，当前会话保持有效。</p>
+            </div>
+          </div>
+          <form class="account-password-form" id="account-password-form">
+            <label class="auth-field">
+              <span class="auth-field__label">当前密码</span>
+              <input class="auth-field__input" id="account-current-password" type="password" autocomplete="current-password" required>
+            </label>
+            <label class="auth-field">
+              <span class="auth-field__label">新密码</span>
+              <input class="auth-field__input" id="account-next-password" type="password" autocomplete="new-password" required>
+            </label>
+            <label class="auth-field">
+              <span class="auth-field__label">确认新密码</span>
+              <input class="auth-field__input" id="account-confirm-password" type="password" autocomplete="new-password" required>
+            </label>
+            <button class="primary-button account-password-submit" id="account-password-submit" type="submit">保存新密码</button>
+            <p class="account-feedback" id="account-password-feedback" aria-live="polite"></p>
+          </form>
+        </section>
+
+        <section class="account-section">
+          <div class="account-section__head">
+            <div>
+              <p class="eyebrow">第三方绑定</p>
+              <h2 class="account-section__title">绑定入口</h2>
+              <p class="account-section__body">先展示接入状态与预留入口，后续接上 OAuth 后即可变成真实绑定。</p>
+            </div>
+          </div>
+          <div class="account-provider-list" id="account-provider-list"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/account.js"></script>
+</body>
+</html>

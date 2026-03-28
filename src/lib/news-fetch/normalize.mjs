@@ -155,7 +155,7 @@ function cleanText(value) {
     return '';
   }
 
-  const raw = Array.isArray(value) ? value.join(' ') : String(value);
+  const raw = stringifyStructuredValue(value);
   const withoutTags = raw
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -193,12 +193,50 @@ function decodeEntities(value) {
     );
 }
 
+function stringifyStructuredValue(value) {
+  if (value == null) {
+    return '';
+  }
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => stringifyStructuredValue(entry)).filter(Boolean).join(' ');
+  }
+
+  if (typeof value === 'object') {
+    if (typeof value._ === 'string') {
+      return value._;
+    }
+
+    for (const key of ['text', 'value', 'content', 'description']) {
+      if (typeof value[key] === 'string') {
+        return value[key];
+      }
+    }
+
+    return Object.values(value)
+      .map((entry) => stringifyStructuredValue(entry))
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  return '';
+}
+
 function findUrlLikeValue(value, depth = 0) {
   if (!value || depth > 4) {
     return '';
   }
 
   if (typeof value === 'string') {
+    const embeddedImage = extractImageUrlFromHtml(value);
+    if (embeddedImage) {
+      return embeddedImage;
+    }
+
     return normalizeUrlForOutput(value);
   }
 
@@ -239,4 +277,9 @@ function findUrlLikeValue(value, depth = 0) {
   }
 
   return '';
+}
+
+function extractImageUrlFromHtml(value) {
+  const match = String(value ?? '').match(/<img[^>]+src=["']([^"']+)["']/i);
+  return match ? normalizeUrlForOutput(match[1]) : '';
 }

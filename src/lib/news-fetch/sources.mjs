@@ -35,4 +35,52 @@ export const NEWS_SOURCES = [
     siteUrl: 'https://www.marktechpost.com/',
     feedUrl: 'https://www.marktechpost.com/feed/',
   },
+  {
+    id: 'huggingface-blog',
+    name: 'Hugging Face Blog',
+    siteUrl: 'https://huggingface.co/blog',
+    feedUrl: 'https://huggingface.co/blog/feed.xml',
+  },
+  {
+    id: 'aws-machine-learning',
+    name: 'AWS Machine Learning Blog',
+    siteUrl: 'https://aws.amazon.com/blogs/machine-learning/',
+    feedUrl: 'https://aws.amazon.com/blogs/machine-learning/feed/',
+  },
+  {
+    id: 'google-ai',
+    name: 'Google AI Blog',
+    siteUrl: 'https://blog.google/innovation-and-ai/technology/ai/',
+    feedUrl: 'https://blog.google/innovation-and-ai/technology/ai/rss/',
+  },
+  {
+    id: 'google-deepmind',
+    name: 'Google DeepMind Blog',
+    siteUrl: 'https://blog.google/innovation-and-ai/models-and-research/google-deepmind/',
+    feedUrl: 'https://blog.google/innovation-and-ai/models-and-research/google-deepmind/rss/',
+  },
+  {
+    id: 'techxplore-ai',
+    name: 'Tech Xplore AI',
+    siteUrl: 'https://techxplore.com/machine-learning-ai-news/',
+    feedUrl: 'https://techxplore.com/rss-feed/machine-learning-ai-news/',
+  },
+  {
+    id: 'sciencedaily-ai',
+    name: 'ScienceDaily AI',
+    siteUrl: 'https://www.sciencedaily.com/news/computers_math/artificial_intelligence/',
+    feedUrl: 'https://www.sciencedaily.com/rss/computers_math/artificial_intelligence.xml',
+  },
+  {
+    id: 'infoq-ai-ml',
+    name: 'InfoQ AI and ML',
+    siteUrl: 'https://www.infoq.com/ai-ml-data-eng/',
+    feedUrl: 'https://feed.infoq.com/ai-ml-data-eng/',
+  },
+  {
+    id: 'mit-news-ai',
+    name: 'MIT News AI',
+    siteUrl: 'https://news.mit.edu/topic/artificial-intelligence2',
+    feedUrl: 'https://news.mit.edu/rss/topic/artificial-intelligence2',
+  },
 ];

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 | AI 新闻与论文归档</title>
+  <meta
+    name="description"
+    content="登录 AI 新闻与论文归档，解锁完整本地内容与个人阅读记录。"
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;800&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="auth-page" data-auth-page="login">
+  <div class="auth-shell">
+    <a class="brand-mark" href="/">
+      <span class="brand-mark__pulse" aria-hidden="true"></span>
+      <span class="brand-mark__text">AI 新闻与论文归档</span>
+    </a>
+
+    <main class="auth-layout">
+      <section class="auth-copy">
+        <p class="eyebrow">登录入口</p>
+        <h1 class="auth-copy__title">登录后继续阅读完整归档内容。</h1>
+        <p class="auth-copy__body" id="auth-page-body">
+          登录后会解锁完整正文、记录已读状态，并保留你的阅读会话。
+        </p>
+        <a class="ghost-button auth-copy__back" id="auth-back-link" href="/">返回首页</a>
+      </section>
+
+      <section class="auth-card">
+        <div class="auth-card__header">
+          <p class="eyebrow">账号验证</p>
+          <h2 class="auth-card__title">登录账号</h2>
+          <p class="auth-card__hint">
+            还没有账号？
+            <a class="auth-card__link" id="auth-switch-link" href="/register">去注册</a>
+          </p>
+        </div>
+
+        <form class="auth-page-form" id="auth-page-form">
+          <label class="auth-field">
+            <span class="auth-field__label">邮箱或显示名</span>
+            <input class="auth-field__input" id="auth-identifier" type="text" autocomplete="username" required>
+          </label>
+          <label class="auth-field">
+            <span class="auth-field__label">密码</span>
+            <input class="auth-field__input" id="auth-password" type="password" autocomplete="current-password" required>
+          </label>
+          <button class="primary-button auth-form__submit" id="auth-submit-button" type="submit">登录账号</button>
+        </form>
+
+        <p class="auth-feedback" id="auth-page-feedback" aria-live="polite"></p>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/auth.js"></script>
+</body>
+</html>

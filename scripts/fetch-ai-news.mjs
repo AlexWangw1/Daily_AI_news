@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 import Parser from 'rss-parser';
 
+import '../src/lib/env/load-env.mjs';
 import { fetchArchivedArticle } from '../src/lib/news-fetch/article-content.mjs';
+import { buildEasyReadArticle } from '../src/lib/news-fetch/easy-read.mjs';
+import { fetchTextWithFallback } from '../src/lib/news-fetch/network.mjs';
 import {
   buildArticleId,
   collectCategories,
@@ -43,14 +46,15 @@ const parser = new Parser({
   },
 });
 
-const MAX_ARTICLES = 60;
-const MAX_ARTICLES_PER_SOURCE = 12;
+const MAX_ARTICLES = 80;
+const MAX_ARTICLES_PER_SOURCE = 10;
 const ARCHIVE_CONCURRENCY = 4;
-const TRANSLATE_CONCURRENCY = 2;
+const TRANSLATE_CONCURRENCY = 6;
 const TRANSLATE_SEPARATOR = '[[ITEM]]';
-const TRANSLATE_ENDPOINT = 'https://translate.plausibility.cloud/api/v1/en/zh/';
-const TRANSLATE_BATCH_CHAR_LIMIT = 900;
-const TRANSLATE_BATCH_ITEM_LIMIT = 3;
+const PLAUSIBILITY_TRANSLATE_ENDPOINT = 'https://translate.plausibility.cloud/api/v1/en/zh/';
+const MYMEMORY_TRANSLATE_ENDPOINT = 'https://api.mymemory.translated.net/get';
+const TRANSLATE_BATCH_CHAR_LIMIT = 700;
+const TRANSLATE_BATCH_ITEM_LIMIT = 2;
 const FAILED_ARCHIVE_RETRY_MS = 6 * 60 * 60 * 1000;
 const shouldSkipTranslation = process.argv.includes('--skip-translate');
 
@@ -68,19 +72,10 @@ function sleep(ms) {
 }
 
 async function fetchFeedXml(feedUrl) {
-  const response = await fetch(feedUrl, {
-    headers: {
-      accept: 'application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5',
-      'user-agent': 'DailyAINewsBot/1.0 (+https://github.com/openai/codex)',
-    },
-    redirect: 'follow',
+  return fetchTextWithFallback(feedUrl, {
+    accept: 'application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5',
+    timeoutMs: 30000,
   });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}`);
-  }
-
-  return response.text();
 }
 
 async function fetchSource(source) {
@@ -128,6 +123,7 @@ function normalizeItem(item, source) {
 
   return {
     id,
+    contentType: 'news',
     title,
     summary,
     url: normalizeUrlForOutput(canonicalUrl) ?? '',
@@ -249,26 +245,77 @@ async function translateTextToChinese(text, attempt = 0) {
     return '';
   }
 
-  const response = await fetch(`${TRANSLATE_ENDPOINT}${encodeURIComponent(value)}`, {
+  try {
+    return await translateTextWithMyMemory(value);
+  } catch (primaryError) {
+    try {
+      return await translateTextWithPlausibility(value, attempt);
+    } catch (fallbackError) {
+      if (attempt < 2) {
+        await sleep(1200 * (attempt + 1));
+        return translateTextToChinese(text, attempt + 1);
+      }
+
+      throw fallbackError;
+    }
+  }
+}
+
+async function translateTextWithMyMemory(text) {
+  const url = `${MYMEMORY_TRANSLATE_ENDPOINT}?q=${encodeURIComponent(text)}&langpair=en|zh-CN`;
+  const response = await fetch(url, {
     headers: {
       accept: 'application/json',
       'user-agent': 'Mozilla/5.0 (compatible; DailyAINewsBot/1.0)',
     },
+    signal: AbortSignal.timeout(12000),
   });
 
   if (!response.ok) {
-    if (response.status === 429 && attempt < 3) {
-      await sleep(1200 * (attempt + 1));
-      return translateTextToChinese(text, attempt + 1);
-    }
-
-    throw new Error(`Translation HTTP ${response.status}`);
+    throw new Error(`MyMemory HTTP ${response.status}`);
   }
 
   const payload = await response.json();
-  return typeof payload?.translation === 'string'
-    ? payload.translation.trim()
-    : '';
+  const translatedText = payload?.responseData?.translatedText;
+
+  if (typeof translatedText !== 'string' || !translatedText.trim()) {
+    throw new Error('MyMemory empty translation');
+  }
+
+  return translatedText.trim();
+}
+
+async function translateTextWithPlausibility(text, attempt = 0) {
+  try {
+    const response = await fetch(`${PLAUSIBILITY_TRANSLATE_ENDPOINT}${encodeURIComponent(text)}`, {
+      headers: {
+        accept: 'application/json',
+        'user-agent': 'Mozilla/5.0 (compatible; DailyAINewsBot/1.0)',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!response.ok) {
+      if ([429, 500, 502, 503, 504].includes(response.status) && attempt < 2) {
+        await sleep(1000 * (attempt + 1));
+        return translateTextWithPlausibility(text, attempt + 1);
+      }
+
+      throw new Error(`Translation HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    return typeof payload?.translation === 'string'
+      ? payload.translation.trim()
+      : '';
+  } catch (error) {
+    if (attempt < 3) {
+      await sleep(1200 * (attempt + 1));
+      return translateTextWithPlausibility(text, attempt + 1);
+    }
+
+    throw error;
+  }
 }
 
 function splitTranslatedSegments(value) {
@@ -327,18 +374,37 @@ function buildFallbackContent(article, archive) {
   return archive.contentText || article.summary || article.title;
 }
 
-function mergeWithCachedArticle(article, cached, fetchedAt) {
+function buildCachedArchive(article, cachedArticle) {
+  return {
+    rawHtml: cachedArticle?.rawHtml || '',
+    contentText: cachedArticle?.contentText || article.summary || article.title,
+    imageUrl: article.imageUrl || cachedArticle?.imageUrl || '',
+  };
+}
+
+function buildCachedTranslations(article, archive, cachedArticle) {
+  return {
+    titleZh: cachedArticle?.titleZh || article.title,
+    summaryZh: cachedArticle?.summaryZh || article.summary,
+    contentTextZh:
+      cachedArticle?.contentTextZh
+      || cachedArticle?.contentText
+      || buildFallbackContent(article, archive),
+  };
+}
+
+function mergeWithCachedArticle(article, cached, fetchedAt, archive, translations, easyRead) {
   stats.reusedArchiveCount += 1;
-  stats.reusedTranslationCount += 1;
 
   return {
     ...article,
-    titleZh: cached.titleZh || article.title,
-    summaryZh: cached.summaryZh || article.summary,
-    contentText: cached.contentText || article.summary || article.title,
-    contentTextZh: cached.contentTextZh || cached.contentText || article.summary || article.title,
-    rawHtml: cached.rawHtml || '',
-    imageUrl: article.imageUrl || cached.imageUrl || '',
+    titleZh: translations.titleZh || article.title,
+    summaryZh: translations.summaryZh || article.summary,
+    contentText: buildFallbackContent(article, archive),
+    contentTextZh: translations.contentTextZh || buildFallbackContent(article, archive),
+    easyRead,
+    rawHtml: archive.rawHtml || '',
+    imageUrl: archive.imageUrl || '',
     fetchedAt,
     updatedAt: fetchedAt,
   };
@@ -373,18 +439,17 @@ function canReuseRecentFallback(article, cachedArticle) {
   return Date.now() - fetchedAt < FAILED_ARCHIVE_RETRY_MS;
 }
 
-function mergeWithRecentFallback(article, cached, fetchedAt) {
-  stats.reusedTranslationCount += 1;
-
+function mergeWithRecentFallback(article, cached, fetchedAt, archive, translations, easyRead) {
   return {
     ...article,
-    titleZh: cached.titleZh || article.title,
-    summaryZh: cached.summaryZh || article.summary,
-    contentText: cached.contentText || article.summary || article.title,
-    contentTextZh: cached.contentTextZh || cached.contentText || article.summary || article.title,
-    rawHtml: '',
-    imageUrl: article.imageUrl || cached.imageUrl || '',
-    fetchedAt: cached.fetchedAt || fetchedAt,
+    titleZh: translations.titleZh || article.title,
+    summaryZh: translations.summaryZh || article.summary,
+    contentText: buildFallbackContent(article, archive),
+    contentTextZh: translations.contentTextZh || buildFallbackContent(article, archive),
+    easyRead,
+    rawHtml: archive.rawHtml || '',
+    imageUrl: archive.imageUrl || '',
+    fetchedAt: cached?.fetchedAt || fetchedAt,
     updatedAt: fetchedAt,
   };
 }
@@ -392,42 +457,79 @@ function mergeWithRecentFallback(article, cached, fetchedAt) {
 async function translateArticle(article, archive, cachedArticle) {
   if (shouldSkipTranslation) {
     return {
-      titleZh: article.title,
-      summaryZh: article.summary,
-      contentTextZh: buildFallbackContent(article, archive),
+      titleZh: looksLikeChineseTranslation(cachedArticle?.titleZh) ? cachedArticle.titleZh : article.title,
+      summaryZh: looksLikeChineseTranslation(cachedArticle?.summaryZh) ? cachedArticle.summaryZh : article.summary,
+      contentTextZh: looksLikeChineseTranslation(cachedArticle?.contentTextZh)
+        ? cachedArticle.contentTextZh
+        : buildFallbackContent(article, archive),
     };
   }
+
+  const contentParagraphs = splitParagraphs(archive.contentText);
 
   if (
     cachedArticle
     && cachedArticle.title === article.title
     && cachedArticle.summary === article.summary
     && cachedArticle.contentText === archive.contentText
-    && cachedArticle.titleZh
-    && cachedArticle.contentTextZh
   ) {
-    stats.reusedTranslationCount += 1;
+    const cachedTitleReady = looksLikeChineseTranslation(cachedArticle.titleZh);
+    const cachedSummaryReady = looksLikeChineseTranslation(cachedArticle.summaryZh);
+    const cachedContentReady = looksLikeChineseTranslation(cachedArticle.contentTextZh);
+
+    if (cachedTitleReady && cachedSummaryReady && cachedContentReady) {
+      stats.reusedTranslationCount += 1;
+      return {
+        titleZh: cachedArticle.titleZh,
+        summaryZh: cachedArticle.summaryZh || article.summary,
+        contentTextZh: cachedArticle.contentTextZh,
+      };
+    }
+
+    let titleZh = cachedTitleReady ? cachedArticle.titleZh : '';
+    let summaryZh = cachedSummaryReady ? (cachedArticle.summaryZh || article.summary) : '';
+
+    if (!titleZh || !summaryZh) {
+      const translatedHead = await translateSegments([
+        article.title,
+        article.summary || contentParagraphs[0] || article.title,
+      ]);
+      titleZh = titleZh || translatedHead[0] || article.title;
+      summaryZh = summaryZh || translatedHead[1] || article.summary;
+    } else {
+      stats.reusedTranslationCount += 1;
+    }
+
     return {
-      titleZh: cachedArticle.titleZh,
-      summaryZh: cachedArticle.summaryZh || article.summary,
-      contentTextZh: cachedArticle.contentTextZh,
+      titleZh,
+      summaryZh,
+      contentTextZh: cachedContentReady
+        ? cachedArticle.contentTextZh
+        : cachedArticle.contentTextZh || cachedArticle.contentText || buildFallbackContent(article, archive),
     };
   }
-
-  const contentParagraphs = splitParagraphs(archive.contentText);
   const [titleZh = article.title, summaryZh = article.summary] = await translateSegments([
     article.title,
     article.summary || contentParagraphs[0] || article.title,
   ]);
-  const translatedParagraphs = await translateSegments(contentParagraphs);
 
   stats.translatedArticleCount += 1;
 
   return {
     titleZh,
     summaryZh,
-    contentTextZh: translatedParagraphs.join('\n\n').trim(),
+    contentTextZh: summaryZh || buildFallbackContent(article, archive),
   };
+}
+
+function buildEasyReadPayload(article, archive, translations, cachedArticle) {
+  return buildEasyReadArticle({
+    ...article,
+    titleZh: translations.titleZh || article.title,
+    summaryZh: translations.summaryZh || article.summary,
+    contentText: buildFallbackContent(article, archive),
+    contentTextZh: translations.contentTextZh || buildFallbackContent(article, archive),
+  });
 }
 
 async function hydrateArticle(article, existingArticles) {
@@ -435,11 +537,31 @@ async function hydrateArticle(article, existingArticles) {
   const cachedArticle = findExistingArticle(article, existingArticles);
 
   if (canReuseCachedArchive(article, cachedArticle)) {
-    return mergeWithCachedArticle(article, cachedArticle, fetchedAt);
+    const archive = buildCachedArchive(article, cachedArticle);
+    const translations = await translateArticle(article, archive, cachedArticle);
+    const easyRead = buildEasyReadPayload(article, archive, translations, cachedArticle);
+    return mergeWithCachedArticle(
+      article,
+      cachedArticle,
+      fetchedAt,
+      archive,
+      translations,
+      easyRead,
+    );
   }
 
   if (canReuseRecentFallback(article, cachedArticle)) {
-    return mergeWithRecentFallback(article, cachedArticle, fetchedAt);
+    const archive = buildCachedArchive(article, cachedArticle);
+    const translations = await translateArticle(article, archive, cachedArticle);
+    const easyRead = buildEasyReadPayload(article, archive, translations, cachedArticle);
+    return mergeWithRecentFallback(
+      article,
+      cachedArticle,
+      fetchedAt,
+      archive,
+      translations,
+      easyRead,
+    );
   }
 
   let archive = {
@@ -461,6 +583,12 @@ async function hydrateArticle(article, existingArticles) {
     archive,
     cachedArticle,
   );
+  const easyRead = buildEasyReadPayload(
+    article,
+    archive,
+    translations,
+    cachedArticle,
+  );
 
   return {
     ...article,
@@ -468,11 +596,22 @@ async function hydrateArticle(article, existingArticles) {
     summaryZh: translations.summaryZh || article.summary,
     contentText: buildFallbackContent(article, archive),
     contentTextZh: translations.contentTextZh || buildFallbackContent(article, archive),
+    easyRead,
     rawHtml: archive.rawHtml,
     imageUrl: article.imageUrl || archive.imageUrl || '',
     fetchedAt,
     updatedAt: fetchedAt,
   };
+}
+
+function looksLikeChineseTranslation(value) {
+  const text = String(value ?? '').trim();
+  if (!text) {
+    return false;
+  }
+
+  const chineseMatches = text.match(/[\u3400-\u9fff]/gu) ?? [];
+  return chineseMatches.length >= Math.max(4, Math.ceil(text.length * 0.12));
 }
 
 async function main() {
@@ -482,28 +621,29 @@ async function main() {
     MAX_ARTICLES,
   );
 
-  const db = openNewsDatabase();
+  const db = await openNewsDatabase();
 
   try {
-    upsertSources(db, NEWS_SOURCES.map(({ id, name, siteUrl }) => ({
+    await upsertSources(db, NEWS_SOURCES.map(({ id, name, siteUrl }) => ({
       id,
+      contentType: 'news',
       name,
       siteUrl,
     })));
 
-    const existingArticles = loadExistingArticles(db);
+    const existingArticles = await loadExistingArticles(db, { contentType: 'news' });
     const hydratedArticles = await mapWithConcurrency(
       articles,
       ARCHIVE_CONCURRENCY,
       (article) => hydrateArticle(article, existingArticles),
     );
 
-    upsertArticles(db, hydratedArticles);
+    await upsertArticles(db, hydratedArticles);
 
     const generatedAt = new Date().toISOString();
-    setMetadata(db, 'generatedAt', generatedAt);
+    await setMetadata(db, 'generatedAt', generatedAt);
 
-    const payload = getNewsSummaryPayload(db, MAX_ARTICLES);
+    const payload = await getNewsSummaryPayload(db, MAX_ARTICLES);
 
     mkdirSync(resolve(projectRoot, 'data'), { recursive: true });
     writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
@@ -528,7 +668,7 @@ async function main() {
       `[news-fetch] wrote ${payload.total} archived articles to ${outputPath}`,
     );
   } finally {
-    closeNewsDatabase(db);
+    await closeNewsDatabase(db, { shutdown: true });
   }
 }
 
